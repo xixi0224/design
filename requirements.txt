@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pymysql
+pdfplumber
+python-docx
+python-multipart
+dashscope
+textract
+olefile
