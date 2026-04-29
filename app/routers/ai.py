@@ -1025,10 +1025,8 @@ async def upload_audio(request: Request):
         import urllib.parse
         # 将反斜杠替换为正斜杠
         url_path = file_path.replace('\\', '/')
-        # 编码文件路径
-        encoded_path = urllib.parse.quote(url_path)
-        # 构建完整的URL
-        file_url = f"/api/audio/{encoded_path}"
+        # 构建静态文件访问路径（直接使用/uploads路径）
+        file_url = f"/{url_path}"
         
         # 返回文件URL和audio_id
         return {
