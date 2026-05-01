@@ -8,3 +8,4 @@ dashscope
 textract
 olefile
 baidu-aip
+ffmpeg-python

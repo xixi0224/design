@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import dashscope
 from dashscope import Generation
 from datetime import datetime
@@ -196,10 +197,11 @@ def asr_service(audio_path: str):
     # 使用 FFmpeg 将音频转换为 pcm 格式（16kHz, 单声道）
     def convert_to_pcm(input_path: str) -> str:
         """使用 FFmpeg 将音频转换为 16kHz, 单声道的 PCM 文件"""
-        # 检查 FFmpeg 是否存在
-        ffmpeg_path = r"d:\tingting\xixi\计算机设计大赛\ZhiNote2.0\ffmpeg-2026-04-19-git-de18feb0f0-essentials_build\bin\ffmpeg.exe"
-        if not os.path.exists(ffmpeg_path):
-            raise RuntimeError(f"FFmpeg 未找到: {ffmpeg_path}")
+        # 使用系统 PATH 中的 ffmpeg
+        ffmpeg_path = shutil.which("ffmpeg")
+        if ffmpeg_path is None:
+            raise RuntimeError("FFmpeg 未找到，请确保已安装 FFmpeg 并添加到系统 PATH")
+        print(f"使用 FFmpeg: {ffmpeg_path}")
         
         output_path = input_path.rsplit('.', 1)[0] + '_converted.pcm'
 
@@ -237,7 +239,10 @@ def asr_service(audio_path: str):
     # 获取音频时长
     def get_audio_duration(pcm_path: str) -> float:
         """获取PCM音频时长（秒）"""
-        ffmpeg_path = r"d:\tingting\xixi\计算机设计大赛\ZhiNote2.0\ffmpeg-2026-04-19-git-de18feb0f0-essentials_build\bin\ffmpeg.exe"
+        # 使用系统 PATH 中的 ffmpeg
+        ffmpeg_path = shutil.which("ffmpeg")
+        if ffmpeg_path is None:
+            raise RuntimeError("FFmpeg 未找到，请确保已安装 FFmpeg 并添加到系统 PATH")
 
         cmd = [
             ffmpeg_path,
