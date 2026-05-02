@@ -773,6 +773,59 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
     try:
         fileId = data.get("fileId")
         
+        # 调试：打印原始输入
+        print(f"原始fileId: {fileId}")
+        
+        # URL解码处理 - 处理前端传入的编码路径
+        import urllib.parse
+        if fileId and isinstance(fileId, str):
+            # 【修改点1】先判断是否是完整URL
+            if fileId.startswith('http://') or fileId.startswith('https://'):
+                parsed_url = urllib.parse.urlparse(fileId)
+                # 从URL中提取路径部分 /uploads/xxx.m4a
+                url_path = parsed_url.path
+                print(f"从URL提取的路径: {url_path}")
+                
+                # 转换为本地文件路径
+                # 移除开头的 / 并确保使用正确的路径分隔符
+                if url_path.startswith('/'):
+                    url_path = url_path[1:]
+                fileId = url_path
+            else:
+                # 【修改点2】增强URL解码处理逻辑
+                # 打印原始输入
+                print(f"解码前fileId: {fileId}")
+                
+                # 多次解码处理，确保彻底解码（处理三重编码）
+                fileId = urllib.parse.unquote(fileId)
+                fileId = urllib.parse.unquote(fileId)  # 再次解码，处理双重编码
+                fileId = urllib.parse.unquote(fileId)  # 第三次解码，确保彻底
+                print(f"URL解码后的fileId: {fileId}")
+                
+                # 如果fileId包含完整URL，提取文件路径部分
+                if 'http://' in fileId or 'https://' in fileId:
+                    try:
+                        parsed_url = urllib.parse.urlparse(fileId)
+                        fileId = parsed_url.path
+                        print(f"从URL提取的文件路径: {fileId}")
+                    except Exception as e:
+                        print(f"URL解析失败: {e}")
+                
+                # 移除路径开头的斜杠（可能有多个）
+                while fileId.startswith('/'):
+                    fileId = fileId[1:]
+                    print(f"移除开头斜杠后的路径: {fileId}")
+                
+                # 如果路径仍然包含 %2F，手动替换（可能还有残留）
+                if '%2F' in fileId:
+                    fileId = fileId.replace('%2F', '/')
+                    print(f"手动替换%2F后的路径: {fileId}")
+                
+                # 确保路径格式正确（以 uploads/ 开头）
+                if not fileId.startswith('uploads/'):
+                    fileId = 'uploads/' + fileId
+                    print(f"添加uploads前缀后的路径: {fileId}")
+        
         # 从数据库获取音频文件路径
         conn = None
         cursor = None
@@ -788,37 +841,54 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
             result = cursor.fetchone()
             if result:
                 audio_path = result[0]
-                print(f"找到音频文件: {audio_path}")
+                print(f"从数据库找到音频文件: {audio_path}")
+                # 确保路径格式正确
+                if audio_path.startswith('/'):
+                    audio_path = audio_path[1:]
+                if not audio_path.startswith('uploads/'):
+                    audio_path = 'uploads/' + audio_path
             else:
                 # 如果数据库中没有找到，尝试从uploads目录中直接查找
                 print(f"数据库中未找到音频文件，fileId: {fileId}")
-                # 这里可以添加备选逻辑，比如根据fileId生成文件名
+                # 尝试将fileId作为文件名直接查找
+                audio_path = fileId
         except Exception as db_error:
             print(f"数据库查询失败: {db_error}")
-            # 数据库查询失败时，仍然尝试进行语音转文字
+            # 如果fileId看起来像文件路径，直接使用它
+            if fileId and ('/' in fileId or '.' in fileId):
+                audio_path = fileId
         finally:
             if cursor:
                 cursor.close()
             if conn:
                 conn.close()
         
-        # 检查音频文件是否存在
-        import os
-        if not audio_path or not os.path.exists(audio_path):
-            # 如果没有找到音频文件，尝试从uploads目录中查找
-            import glob
-            uploads_dir = "uploads"
-            audio_files = glob.glob(f"{uploads_dir}/*.m4a") + glob.glob(f"{uploads_dir}/*.mp3") + glob.glob(f"{uploads_dir}/*.wav")
-            if audio_files:
-                # 取最新的音频文件
-                audio_files.sort(key=os.path.getmtime, reverse=True)
-                audio_path = audio_files[0]
-                print(f"使用最新的音频文件: {audio_path}")
-            else:
-                print("没有找到音频文件")
-                raise HTTPException(status_code=404, detail="音频文件不存在")
+        print(f"最终使用的音频文件路径: {audio_path}")
         
-        # 调用真实的语音转文字服务
+        # 直接使用本地文件路径，不要用URL（Railway部署时URL无法被FFmpeg访问）
+        if not audio_path:
+            print("没有找到音频文件")
+            raise HTTPException(status_code=404, detail="音频文件不存在")
+        
+        # 检查文件是否实际存在
+        import os
+        full_path = audio_path
+        if not os.path.isabs(audio_path):
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            full_path = os.path.join(project_root, audio_path)
+        
+        if not os.path.exists(full_path):
+            print(f"文件不存在: {full_path}")
+            # 列出uploads目录内容
+            uploads_dir = os.path.join(project_root, "uploads")
+            if os.path.exists(uploads_dir):
+                files = os.listdir(uploads_dir)
+                print(f"uploads目录中的文件: {files}")
+            raise HTTPException(status_code=404, detail=f"音频文件不存在: {audio_path}")
+        
+        print(f"文件存在，大小: {os.path.getsize(full_path)} bytes")
+        
+        # 调用真实的语音转文字服务（直接传递本地文件路径）
         from app.services.ai_analysis_service import asr_service
         try:
             print(f"开始调用语音转文字服务: {audio_path}")
@@ -970,15 +1040,13 @@ async def upload_audio(request: Request):
             os.makedirs(upload_dir)
             print(f"创建上传目录: {upload_dir}")
         
-        # 使用原始文件名
-        file_name = audio_file.filename
-        # 确保文件名唯一
-        base_name, file_ext = os.path.splitext(file_name)
-        counter = 1
-        while os.path.exists(os.path.join(upload_dir, file_name)):
-            file_name = f"{base_name}_{counter}{file_ext}"
-            counter += 1
+        # 使用UUID生成安全的文件名，避免特殊字符问题
+        file_ext = os.path.splitext(audio_file.filename)[1] if audio_file.filename else '.mp3'
+        file_name = f"{uuid.uuid4().hex}{file_ext}"
         file_path = os.path.join(upload_dir, file_name)
+        
+        print(f"生成的安全文件名: {file_name}")
+        print(f"原始文件名: {audio_file.filename}")
         
         # 保存文件
         print(f"开始保存文件: {file_path}")
@@ -1022,17 +1090,32 @@ async def upload_audio(request: Request):
                 conn.close()
         
         # 构建可访问的URL路径
-        import urllib.parse
-        # 将反斜杠替换为正斜杠
+        # 确保路径格式正确：相对路径，不带开头斜杠
         url_path = file_path.replace('\\', '/')
-        # 构建静态文件访问路径（直接使用/uploads路径）
-        file_url = f"/{url_path}"
+        # 确保路径以 uploads/ 开头，不带开头斜杠
+        url_path = re.sub(r'^/*(uploads/)', r'\1', url_path)
+        # 如果路径不是以 uploads/ 开头，添加前缀
+        if not url_path.startswith('uploads/'):
+            url_path = f'uploads/{url_path}'
+        
+        # 对路径中的文件名部分进行URL编码（处理中文、空格等特殊字符）
+        import urllib.parse
+        if '/' in url_path:
+            path_parts = url_path.rsplit('/', 1)
+            # 只编码文件名部分，不编码路径分隔符
+            encoded_filename = urllib.parse.quote(path_parts[1], safe='')
+            url_path = path_parts[0] + '/' + encoded_filename
+        
+        # 打印调试信息
+        print(f"上传成功，返回路径: {url_path}")
         
         # 返回文件URL和audio_id
+        # 返回相对路径（如 /uploads/xxx.m4a），让前端自己构建完整URL
+        # 这样可以避免URL双重编码问题
         return {
             "code": 0,
             "data": {
-                "filePath": file_url,
+                "filePath": '/' + url_path,  # 返回相对路径，以/开头，如 /uploads/xxx.m4a
                 "audioId": audio_id or 1
             }
         }
@@ -1054,20 +1137,30 @@ async def serve_audio(file_path: str):
         decoded_path = urllib.parse.unquote(file_path)
         print(f"请求音频文件: {decoded_path}")
         
-        # 检查文件是否存在
+        # 【修改点1】增强文件查找逻辑
+        # 检查文件是否存在（支持相对路径和绝对路径）
         if not os.path.exists(decoded_path):
-            raise HTTPException(status_code=404, detail="音频文件不存在")
+            # 尝试在uploads目录查找
+            if not decoded_path.startswith('uploads'):
+                alt_path = os.path.join('uploads', os.path.basename(decoded_path))
+                if os.path.exists(alt_path):
+                    decoded_path = alt_path
+                    print(f"在uploads目录找到: {decoded_path}")
+                else:
+                    raise HTTPException(status_code=404, detail=f"音频文件不存在: {decoded_path}")
         
         # 读取文件内容
         with open(decoded_path, "rb") as f:
             content = f.read()
         
+        # 【修改点2】优化MIME类型判断
         # 根据文件扩展名设置MIME类型
-        file_ext = decoded_path.split('.')[-1].lower()
+        file_ext = os.path.splitext(decoded_path)[1].lower().replace('.', '')
         mime_types = {
             'mp3': 'audio/mpeg',
             'wav': 'audio/wav',
-            'm4a': 'audio/mp4'
+            'm4a': 'audio/mp4',
+            'mp4': 'audio/mp4'  # 添加mp4支持
         }
         mime_type = mime_types.get(file_ext, 'application/octet-stream')
         
@@ -1080,4 +1173,6 @@ async def serve_audio(file_path: str):
         raise
     except Exception as e:
         print(f"提供音频文件失败: {e}")
-        raise HTTPException(status_code=500, detail="提供音频文件失败")
+        import traceback
+        traceback.print_exc()  # 【修改点3】打印详细错误堆栈
+        raise HTTPException(status_code=500, detail=f"提供音频文件失败: {str(e)}")

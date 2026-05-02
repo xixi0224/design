@@ -25,10 +25,6 @@ from app.routers.study_stats import router as study_stats_router
 from app.routers.report import router as report_router
 from app.routers.auth import router as auth_router
 
-if os.name != "nt":
-    subprocess.run(["apt-get", "update", "-y"], check=True)
-    subprocess.run(["apt-get", "install", "-y", "ffmpeg"], check=True)
-
 # 安装 Python 依赖
 subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
 def init_database():

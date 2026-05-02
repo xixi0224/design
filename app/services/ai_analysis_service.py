@@ -180,192 +180,135 @@ def perform_asr(audio_id: int):
 
 def asr_service(audio_path: str):
     """
-    使用百度云短语音识别 API 进行语音转文本
-    通过分段处理实现长音频识别
+    使用百度云语音识别 API 进行语音转文本
+    支持长音频自动分段识别（超过60秒）
     """
     from aip import AipSpeech
-    import subprocess
-
+    from pydub import AudioSegment
+    import io
+    
     # 百度云应用信息
     API_KEY = 'HYPim6GzLxhPjBXIv11DRCt8'
     SECRET_KEY = '6Tiai01NZgTpU5cl4fvJMQBT92F2zuGY'
     APP_ID = '122981257'
-
+    
     # 初始化百度云语音客户端
     client = AipSpeech(APP_ID, API_KEY, SECRET_KEY)
-
-    # 使用 FFmpeg 将音频转换为 pcm 格式（16kHz, 单声道）
-    def convert_to_pcm(input_path: str) -> str:
-        """使用 FFmpeg 将音频转换为 16kHz, 单声道的 PCM 文件"""
-        # 使用系统 PATH 中的 ffmpeg
-        ffmpeg_path = shutil.which("ffmpeg")
-        if ffmpeg_path is None:
-            raise RuntimeError("FFmpeg 未找到，请确保已安装 FFmpeg 并添加到系统 PATH")
-        print(f"使用 FFmpeg: {ffmpeg_path}")
-        
-        output_path = input_path.rsplit('.', 1)[0] + '_converted.pcm'
-
-        cmd = [
-            ffmpeg_path,
-            "-hide_banner",
-            "-loglevel", "error",
-            "-y",
-            "-i", input_path,
-            "-f", "s16le",
-            "-ar", "16000",
-            "-ac", "1",
-            output_path
-        ]
-
-        print(f"开始转换音频为 16kHz PCM 格式...")
-        print(f"FFmpeg 路径: {ffmpeg_path}")
-        print(f"输入文件: {input_path}")
-        print(f"输出文件: {output_path}")
-        
-        try:
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, shell=True)
-            if result.returncode != 0:
-                error_msg = result.stderr.decode('utf-8', errors='replace')
-                raise RuntimeError(f"FFmpeg 转换失败: {error_msg}")
-
-            file_size = os.path.getsize(output_path)
-            print(f"音频转换完成，输出文件: {output_path}，大小: {file_size} bytes")
-            return output_path
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("FFmpeg 转换超时")
-        except Exception as e:
-            raise RuntimeError(f"FFmpeg 转换异常：{e}")
-
-    # 获取音频时长
-    def get_audio_duration(pcm_path: str) -> float:
-        """获取PCM音频时长（秒）"""
-        # 使用系统 PATH 中的 ffmpeg
-        ffmpeg_path = shutil.which("ffmpeg")
-        if ffmpeg_path is None:
-            raise RuntimeError("FFmpeg 未找到，请确保已安装 FFmpeg 并添加到系统 PATH")
-
-        cmd = [
-            ffmpeg_path,
-            "-hide_banner",
-            "-loglevel", "error",
-            "-i", audio_path,
-            "-f", "s16le",
-            "-ar", "16000",
-            "-ac", "1",
-            "-t", "0.01",
-            "NUL"
-        ]
-
-        try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
-        except:
-            pass
-
-        file_size = os.path.getsize(pcm_path)
-        # PCM: 16bit = 2 bytes, 16000Hz, 单声道
-        # 每秒字节数 = 16000 * 2 = 32000
-        bytes_per_second = 16000 * 2
-        duration = file_size / bytes_per_second
-        return duration
-
-    # 分段识别长音频
-    def recognize_segment(client, audio_data: bytes, offset: int = 0):
-        """识别单个音频片段"""
-        result = client.asr(audio_data, 'pcm', 16000, {
-            'dev_pid': 1537,  # 中文普通话
-        })
-        return result
-
+    
     try:
-        # 1. 转换音频为PCM格式
-        pcm_path = convert_to_pcm(audio_path)
-
-        # 2. 读取PCM文件
-        with open(pcm_path, 'rb') as f:
-            pcm_data = f.read()
-
-        total_size = len(pcm_data)
-        print(f"PCM音频数据大小: {total_size} bytes")
-
-        # 3. 获取音频时长
-        duration = total_size / (16000 * 2)
-        print(f"音频时长: {duration:.2f} 秒")
-
-        # 4. 根据时长决定处理方式
-        MAX_SEGMENT_DURATION = 55  # 每次最多55秒，留点余量
-        MAX_SEGMENT_SIZE = int(MAX_SEGMENT_DURATION * 16000 * 2)  # 字节数
-
-        if duration > MAX_SEGMENT_DURATION:
-            # 长音频：分段处理
-            num_segments = int((total_size / MAX_SEGMENT_SIZE) + 0.5)
-            if num_segments < 1:
-                num_segments = 1
-
-            print(f"音频时长 {duration:.2f} 秒，超过 {MAX_SEGMENT_DURATION} 秒限制，需要分为 {num_segments} 段处理")
-
-            full_text = []
-            for i in range(num_segments):
-                start = i * MAX_SEGMENT_SIZE
-                end = start + MAX_SEGMENT_SIZE if i < num_segments - 1 else total_size
-                segment_data = pcm_data[start:end]
-
-                print(f"正在识别第 {i+1}/{num_segments} 段...")
-
-                result = recognize_segment(client, segment_data)
-
-                print(f"第 {i+1} 段识别响应: {result}")
-
-                if 'err_no' in result and result.get('err_no') != 0:
-                    print(f"第 {i+1} 段识别失败: {result.get('err_msg', '识别失败')}，继续下一段")
-                    continue
-
-                if 'result' in result and len(result['result']) > 0:
-                    segment_text = ''.join(result['result'])
-                    full_text.append(segment_text)
-                    print(f"第 {i+1} 段识别成功，长度: {len(segment_text)}")
-
-            # 清理临时文件
-            try:
-                if os.path.exists(pcm_path):
-                    os.remove(pcm_path)
-            except:
-                pass
-
-            if full_text:
-                final_text = ''.join(full_text)
-                print(f"分段识别完成，最终文本长度: {len(final_text)}")
-                return final_text
+        # 判断输入是 URL 还是本地文件路径
+        is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
+        
+        if is_url:
+            # URL 识别：直接调用百度云 API
+            print(f"使用 URL 进行语音识别: {audio_path}")
+            
+            result = client.asrUrl(audio_path, 'm4a', 16000, {
+                'dev_pid': 1537,  # 中文普通话
+            })
+            
+            print(f"百度云识别响应: {result}")
+            
+            if result.get('err_no') == 0 and 'result' in result:
+                return ''.join(result['result'])
             else:
-                raise Exception("所有分段识别均失败")
-        else:
-            # 短音频：直接识别
-            print("短音频，直接识别...")
-
-            result = recognize_segment(client, pcm_data)
-            print(f"识别响应: {result}")
-
-            # 清理临时文件
-            try:
-                if os.path.exists(pcm_path):
-                    os.remove(pcm_path)
-            except:
-                pass
-
-            if 'err_no' in result and result.get('err_no') != 0:
                 raise Exception(f"ASR 识别失败: {result.get('err_msg', '识别失败')}")
-
-            if 'result' in result and len(result['result']) > 0:
-                text = ''.join(result['result'])
-                print(f"识别成功，文本长度: {len(text)}")
-                return text
-
-            raise Exception("ASR 识别返回结果格式异常")
-
+        else:
+            # 本地文件路径处理
+            print(f"本地文件路径: {audio_path}")
+            
+            # 获取项目根目录
+            import os
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+            # 构建完整路径
+            if not os.path.isabs(audio_path):
+                full_path = os.path.join(project_root, audio_path)
+            else:
+                full_path = audio_path
+            
+            full_path = os.path.abspath(full_path)
+            print(f"完整文件路径: {full_path}")
+            
+            # 检查文件是否存在
+            if not os.path.exists(full_path):
+                print(f"本地文件不存在: {full_path}")
+                raise RuntimeError(f"音频文件不存在: {full_path}")
+            
+            print(f"文件存在，大小: {os.path.getsize(full_path)} bytes")
+            
+            # 使用 pydub 加载音频并获取时长
+            audio = AudioSegment.from_file(full_path)
+            duration_seconds = len(audio) / 1000.0  # pydub 返回毫秒
+            print(f"音频时长: {duration_seconds:.2f} 秒")
+            
+            # 判断是否需要分段
+            MAX_SEGMENT_DURATION = 55  # 每段最多55秒（留5秒余量）
+            
+            if duration_seconds <= MAX_SEGMENT_DURATION:
+                # 短音频：直接识别
+                print("短音频，直接识别...")
+                
+                # 读取音频数据
+                with open(full_path, 'rb') as f:
+                    audio_data = f.read()
+                
+                # 获取文件扩展名
+                file_ext = os.path.splitext(full_path)[1].lower().replace('.', '')
+                
+                # 调用百度云 API
+                result = client.asr(audio_data, file_ext, 16000, {
+                    'dev_pid': 1537,  # 中文普通话
+                })
+                
+                print(f"百度云识别响应: {result}")
+                
+                if result.get('err_no') == 0 and 'result' in result:
+                    return ''.join(result['result'])
+                else:
+                    raise Exception(f"ASR 识别失败: {result.get('err_msg', '识别失败')}")
+            else:
+                # 长音频：分段处理
+                print(f"长音频，需要分为 {int(duration_seconds // MAX_SEGMENT_DURATION) + 1} 段处理")
+                
+                full_text = []
+                num_segments = int(duration_seconds // MAX_SEGMENT_DURATION) + 1
+                
+                for i in range(num_segments):
+                    # 计算分段起始和结束时间（毫秒）
+                    start_time = i * MAX_SEGMENT_DURATION * 1000
+                    end_time = min((i + 1) * MAX_SEGMENT_DURATION * 1000, len(audio))
+                    
+                    # 截取音频段
+                    segment = audio[start_time:end_time]
+                    segment_duration = len(segment) / 1000.0
+                    
+                    print(f"正在识别第 {i+1}/{num_segments} 段 (时长: {segment_duration:.2f}秒)...")
+                    
+                    # 将音频段导出为字节流
+                    buffer = io.BytesIO()
+                    file_ext = os.path.splitext(full_path)[1].lower().replace('.', '')
+                    segment.export(buffer, format=file_ext)
+                    audio_data = buffer.getvalue()
+                    
+                    # 调用百度云 API
+                    result = client.asr(audio_data, file_ext, 16000, {
+                        'dev_pid': 1537,
+                    })
+                    
+                    print(f"第 {i+1} 段识别响应: {result}")
+                    
+                    if result.get('err_no') == 0 and 'result' in result:
+                        full_text.append(''.join(result['result']))
+                        print(f"第 {i+1} 段识别成功")
+                    else:
+                        print(f"第 {i+1} 段识别失败: {result.get('err_msg', '未知错误')}")
+                
+                # 合并所有段落的识别结果
+                if full_text:
+                    return ''.join(full_text)
+                else:
+                    raise Exception("所有分段识别均失败")
+    
     except Exception as e:
-        # 清理临时文件
-        try:
-            if 'pcm_path' in locals() and os.path.exists(pcm_path):
-                os.remove(pcm_path)
-        except:
-            pass
         raise Exception(f"语音转文本失败：{e}")

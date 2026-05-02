@@ -62,6 +62,31 @@ def init_database():
                     print(f"  ❌ 执行失败: {str(e)}")
                     print(f"     SQL: {statement[:100]}...")
                     error_count += 1
+
+        # 兜底：补齐业务代码依赖但 schema 可能遗漏的表
+        # 说明：线上日志出现过 railway.zhinote_audio_files 不存在，导致上传/转写链路失败
+        fallback_statements = [
+            """
+            CREATE TABLE IF NOT EXISTS zhinote_audio_files (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                file_name VARCHAR(255) NOT NULL,
+                file_path VARCHAR(512) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+        ]
+
+        for statement in fallback_statements:
+            stmt = statement.strip()
+            if not stmt:
+                continue
+            try:
+                cursor.execute(stmt)
+                success_count += 1
+                print("  ✅ 兜底建表/补表成功: zhinote_audio_files")
+            except Exception as e:
+                # 兜底失败不阻断服务启动，但需要打印出来方便排查
+                print(f"  ⚠️  兜底建表失败: {str(e)}")
         
         conn.commit()
         
