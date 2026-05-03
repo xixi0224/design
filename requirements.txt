@@ -9,3 +9,4 @@ textract
 olefile
 baidu-aip
 pydub
+websocket-client
