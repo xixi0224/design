@@ -768,6 +768,12 @@ async def add_to_review_plan(data: Dict[str, Any] = Body(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"添加到复习计划失败: {str(e)}")
 
+@router.post("/asr/asr/convert")
+async def asr_convert_v2(data: Dict[str, Any] = Body(...)):
+    # 兼容前端错误调用（路径重复）
+    print("检测到路径重复，转发到正确路由")
+    return await asr_convert(data)
+
 @router.post("/asr/convert")
 async def asr_convert(data: Dict[str, Any] = Body(...)):
     try:
