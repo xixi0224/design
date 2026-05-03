@@ -1085,7 +1085,8 @@ async def upload_audio(request: Request):
                 print(f"七牛云上传信息: {info}")
                 
                 if ret and 'key' in ret:
-                    qiniu_url = f"https://{QINIU_DOMAIN}/{file_name}"
+                    # 七牛云测试域名不支持HTTPS，使用HTTP
+                    qiniu_url = f"http://{QINIU_DOMAIN}/{file_name}"
                     print(f"七牛云CDN地址: {qiniu_url}")
             else:
                 print("未配置七牛云，跳过上传")
