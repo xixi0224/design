@@ -1105,6 +1105,8 @@ async def upload_audio(request: Request):
             print(f"七牛云上传失败: {qiniu_error}")
         
         # 保存到数据库，获取audio_id
+        # 【重要修改】存储本地路径到数据库，而不是七牛云URL
+        # 这样ASR处理时可以使用本地文件
         conn = None
         cursor = None
         audio_id = None
@@ -1117,7 +1119,7 @@ async def upload_audio(request: Request):
                 INSERT INTO zhinote_audio_files (file_name, file_path, created_at)
                 VALUES (%s, %s, NOW())
                 """,
-                (file_name, qiniu_url if qiniu_url else file_path)
+                (file_name, file_path)  # 存储本地路径，不是URL
             )
             audio_id = cursor.lastrowid
             conn.commit()
