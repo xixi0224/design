@@ -14,7 +14,7 @@ async def analyze_content_endpoint(request: AnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
 
-@router.post("/asr", response_model=ASRResponse)
+@router.post("/asr/analyze", response_model=ASRResponse)
 async def perform_asr_endpoint(request: ASRRequest):
     try:
         return perform_asr(request.audio_id)

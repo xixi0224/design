@@ -382,7 +382,7 @@ async def extract_exam_points(data: Dict[str, Any] = Body(...)):
 内容：
 {content[:3000]}"""
 
-        response = Generation.call(
+        response = Generation.with_messages(
             model=DASHSCOPE_MODEL,
             messages=[
                 {"role": "system", "content": "你是一个严谨的考试分析专家。请严格按照用户要求的JSON数组格式输出考点列表，只输出JSON，不要输出任何解释文字、markdown标记或代码块。"},
