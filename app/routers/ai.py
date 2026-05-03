@@ -1043,7 +1043,34 @@ async def save_tags(data: Dict[str, Any] = Body(...)):
 async def upload_audio(request: Request):
     try:
         # 处理文件上传
-        form = await r        content = await audio_file.read()
+        form = await request.form()
+        audio_file = form.get("audio")
+        
+        if not audio_file:
+            raise HTTPException(status_code=400, detail="未上传音频文件")
+        
+        # 保存文件到本地
+        import os
+        import uuid
+        
+        # 创建上传目录
+        upload_dir = "uploads"
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+            print(f"创建上传目录: {upload_dir}")
+        
+        # 使用UUID生成安全的文件名，避免特殊字符问题
+        file_ext = os.path.splitext(audio_file.filename)[1] if audio_file.filename else '.mp3'
+        file_name = f"{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(upload_dir, file_name)
+        
+        print(f"生成的安全文件名: {file_name}")
+        print(f"原始文件名: {audio_file.filename}")
+        
+        # 保存文件
+        print(f"开始保存文件: {file_path}")
+        print(f"文件大小: {audio_file.size} bytes")
+        content = await audio_file.read()
         with open(file_path, "wb") as f:
             f.write(content)
             print(f"写入文件大小: {len(content)} bytes")
