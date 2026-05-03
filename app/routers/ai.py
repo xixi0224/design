@@ -1155,32 +1155,7 @@ async def upload_audio(request: Request):
             "code": 0,
             "data": {
                 "filePath": url_path if qiniu_url else ('/' + url_path),
-以 uploads/ 开头，不带开头斜杠
-        url_path = re.sub(r'^/*(uploads/)', r'\1', url_path)
-        # 如果路径不是以 uploads/ 开头，添加前缀
-        if not url_path.startswith('uploads/'):
-            url_path = f'uploads/{url_path}'
-        
-        # 对路径中的文件名部分进行URL编码（处理中文、空格等特殊字符）
-        import urllib.parse
-        if '/' in url_path:
-            path_parts = url_path.rsplit('/', 1)
-            # 只编码文件名部分，不编码路径分隔符
-            encoded_filename = urllib.parse.quote(path_parts[1], safe='')
-            url_path = path_parts[0] + '/' + encoded_filename
-        
-        # 打印调试信息
-        print(f"上传成功，返回路径: {url_path}")
-        
-        # 返回文件URL和audio_id
-        # 返回相对路径（如 /uploads/xxx.m4a），让前端自己构建完整URL
-        # 这样可以避免URL双重编码问题
-        return {
-            "code": 0,
-            "data": {
-                "filePath": '/' + url_path,  # 返回相对路径，以/开头，如 /uploads/xxx.m4a
                 "audioId": audio_id or 1
-            }
         }
     except HTTPException:
         raise
