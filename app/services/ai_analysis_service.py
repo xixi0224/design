@@ -205,7 +205,18 @@ def asr_service(audio_path: str):
         is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
         
         if is_url:
-            raise Exception("URL 识别暂不支持,请使用本地文件")
+            print(f"处理 URL 输入: {audio_path}")
+            # 使用 requests 下载文件到临时目录
+            import tempfile
+            response = requests.get(audio_path, stream=True)
+            response.raise_for_status()
+            
+            # 创建临时文件
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                audio_path = f.name
+            print(f"文件下载到临时目录: {audio_path}")
         else:
             # 本地文件路径处理
             print(f"本地文件路径: {audio_path}")
@@ -265,6 +276,13 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         digestmod=hashlib.sha1
     ).digest()
     signa = base64.b64encode(signa).decode('utf-8')
+    
+    # 调试信息
+    print(f"APPID: {appid}")
+    print(f"时间戳: {ts}")
+    print(f"BaseString: {base_string}")
+    print(f"MD5: {md5_value}")
+    print(f"Signa: {signa}")
     
     # 步骤1: 预处理 - 创建任务
     print("步骤1: 创建转写任务...")
