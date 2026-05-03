@@ -205,18 +205,7 @@ def asr_service(audio_path: str):
         is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
         
         if is_url:
-            print(f"处理 URL 输入: {audio_path}")
-            # 使用 requests 下载文件到临时目录
-            import tempfile
-            response = requests.get(audio_path, stream=True)
-            response.raise_for_status()
-            
-            # 创建临时文件
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                audio_path = f.name
-            print(f"文件下载到临时目录: {audio_path}")
+            raise Exception("URL 识别暂不支持,请使用本地文件")
         else:
             # 本地文件路径处理
             print(f"本地文件路径: {audio_path}")
