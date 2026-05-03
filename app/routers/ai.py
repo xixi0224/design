@@ -1156,6 +1156,7 @@ async def upload_audio(request: Request):
             "data": {
                 "filePath": url_path if qiniu_url else ('/' + url_path),
                 "audioId": audio_id or 1
+            }
         }
     except HTTPException:
         raise
