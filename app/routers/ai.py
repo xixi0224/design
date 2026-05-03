@@ -384,8 +384,11 @@ async def extract_exam_points(data: Dict[str, Any] = Body(...)):
 
         response = Generation.call(
             model=DASHSCOPE_MODEL,
-            prompt=prompt,
-            system_prompt="你是一个严谨的考试分析专家。请严格按照用户要求的JSON数组格式输出考点列表，只输出JSON，不要输出任何解释文字、markdown标记或代码块。"
+            messages=[
+                {"role": "system", "content": "你是一个严谨的考试分析专家。请严格按照用户要求的JSON数组格式输出考点列表，只输出JSON，不要输出任何解释文字、markdown标记或代码块。"},
+                {"role": "user", "content": prompt}
+            ],
+            result_format="message"
         )
 
         exam_points_text = response.output.choices[0].message.content
@@ -1040,34 +1043,7 @@ async def save_tags(data: Dict[str, Any] = Body(...)):
 async def upload_audio(request: Request):
     try:
         # 处理文件上传
-        form = await request.form()
-        audio_file = form.get("audio")
-        
-        if not audio_file:
-            raise HTTPException(status_code=400, detail="未上传音频文件")
-        
-        # 保存文件到本地
-        import os
-        import uuid
-        
-        # 创建上传目录
-        upload_dir = "uploads"
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
-            print(f"创建上传目录: {upload_dir}")
-        
-        # 使用UUID生成安全的文件名，避免特殊字符问题
-        file_ext = os.path.splitext(audio_file.filename)[1] if audio_file.filename else '.mp3'
-        file_name = f"{uuid.uuid4().hex}{file_ext}"
-        file_path = os.path.join(upload_dir, file_name)
-        
-        print(f"生成的安全文件名: {file_name}")
-        print(f"原始文件名: {audio_file.filename}")
-        
-        # 保存文件
-        print(f"开始保存文件: {file_path}")
-        print(f"文件大小: {audio_file.size} bytes")
-        content = await audio_file.read()
+        form = await r        content = await audio_file.read()
         with open(file_path, "wb") as f:
             f.write(content)
             print(f"写入文件大小: {len(content)} bytes")
@@ -1101,10 +1077,7 @@ async def upload_audio(request: Request):
                 print(f"七牛云上传信息: {info}")
                 
                 if ret and 'key' in ret:
-                    # 七牛云测试域名不支持HTTPS，使用HTTP
-                    # 清理域名中的空白字符，防止URL错误
-                    clean_domain = QINIU_DOMAIN.strip()
-                    qiniu_url = f"http://{clean_domain}/{file_name}"
+                    qiniu_url = f"https://{QINIU_DOMAIN}/{file_name}"
                     print(f"七牛云CDN地址: {qiniu_url}")
             else:
                 print("未配置七牛云，跳过上传")
@@ -1128,9 +1101,11 @@ async def upload_audio(request: Request):
             )
             audio_id = cursor.lastrowid
             conn.commit()
-            print(f"数据库保存成功，audio_id: {audio_id}")
-        except Exception as db_error:
-            print(f"数据库保存失败: {db_error}")
+            print(f"数据库保存成功，au                    # 七牛云测试域名不支持HTTPS，使用HTTP
+                    # 清理域名中的空白字符，防止URL错误
+                    clean_domain = QINIU_DOMAIN.strip()
+                    qiniu_url = f"http://{clean_domain}/{file_name}"
+ print(f"数据库保存失败: {db_error}")
         finally:
             if cursor:
                 cursor.close()
@@ -1163,6 +1138,30 @@ async def upload_audio(request: Request):
             "code": 0,
             "data": {
                 "filePath": url_path if qiniu_url else ('/' + url_path),
+以 uploads/ 开头，不带开头斜杠
+        url_path = re.sub(r'^/*(uploads/)', r'\1', url_path)
+        # 如果路径不是以 uploads/ 开头，添加前缀
+        if not url_path.startswith('uploads/'):
+            url_path = f'uploads/{url_path}'
+        
+        # 对路径中的文件名部分进行URL编码（处理中文、空格等特殊字符）
+        import urllib.parse
+        if '/' in url_path:
+            path_parts = url_path.rsplit('/', 1)
+            # 只编码文件名部分，不编码路径分隔符
+            encoded_filename = urllib.parse.quote(path_parts[1], safe='')
+            url_path = path_parts[0] + '/' + encoded_filename
+        
+        # 打印调试信息
+        print(f"上传成功，返回路径: {url_path}")
+        
+        # 返回文件URL和audio_id
+        # 返回相对路径（如 /uploads/xxx.m4a），让前端自己构建完整URL
+        # 这样可以避免URL双重编码问题
+        return {
+            "code": 0,
+            "data": {
+                "filePath": '/' + url_path,  # 返回相对路径，以/开头，如 /uploads/xxx.m4a
                 "audioId": audio_id or 1
             }
         }
