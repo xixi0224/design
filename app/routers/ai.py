@@ -311,7 +311,7 @@ async def save_compressed_version(data: Dict[str, Any] = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存压缩版本失败: {str(e)}")
 
-@router.post("/ai/extract-exam-points")
+@router.post("/extract-exam-points")
 async def extract_exam_points(data: Dict[str, Any] = Body(...)):
     try:
         fileId = data.get("fileId")
@@ -382,14 +382,10 @@ async def extract_exam_points(data: Dict[str, Any] = Body(...)):
 内容：
 {content[:3000]}"""
 
-        response = Generation.with_messages(
+        response = Generation.call(
             model=DASHSCOPE_MODEL,
-            messages=[
-                {"role": "system", "content": "你是一个严谨的考试分析专家。请严格按照用户要求的JSON数组格式输出考点列表，只输出JSON，不要输出任何解释文字、markdown标记或代码块。"},
-                {"role": "user", "content": prompt}
-            ],
-            result_format="message",
-            response_format={"type": "json_object"}
+            prompt=prompt,
+            system_prompt="你是一个严谨的考试分析专家。请严格按照用户要求的JSON数组格式输出考点列表，只输出JSON，不要输出任何解释文字、markdown标记或代码块。"
         )
 
         exam_points_text = response.output.choices[0].message.content
