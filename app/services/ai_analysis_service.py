@@ -204,9 +204,35 @@ def asr_service(audio_path: str):
     try:
         # 判断输入是 URL 还是本地文件路径
         is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
+        full_path = None
         
         if is_url:
-            raise Exception("URL 识别暂不支持,请使用本地文件")
+            # URL 输入：先下载到临时目录
+            print(f"检测到URL: {audio_path}")
+            
+            # 创建临时目录
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
+            print(f"创建临时目录: {temp_dir}")
+            
+            # 从URL提取文件名
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(audio_path)
+            filename = os.path.basename(parsed_url.path)
+            full_path = os.path.join(temp_dir, filename)
+            print(f"临时文件路径: {full_path}")
+            
+            # 下载文件
+            print("开始下载文件...")
+            response = requests.get(audio_path, stream=True, timeout=60)
+            response.raise_for_status()
+            
+            with open(full_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            file_size = os.path.getsize(full_path)
+            print(f"文件下载完成，大小: {file_size} bytes")
         else:
             # 本地文件路径处理
             print(f"本地文件路径: {audio_path}")
@@ -229,9 +255,16 @@ def asr_service(audio_path: str):
                 raise RuntimeError(f"音频文件不存在: {full_path}")
             
             print(f"文件存在,大小: {os.path.getsize(full_path)} bytes")
-            
-            # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
-            return xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
+        
+        # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
+        result = xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
+        
+        # 如果是URL下载的临时文件，清理临时文件
+        if is_url and os.path.exists(full_path):
+            os.remove(full_path)
+            print(f"清理临时文件: {full_path}")
+        
+        return result
     
     except Exception as e:
         raise Exception(f"语音转文本失败：{e}")
