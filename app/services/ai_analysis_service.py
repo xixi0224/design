@@ -185,8 +185,8 @@ def asr_service(audio_path: str):
     支持长音频自动分段识别（超过60秒）
     """
     import os
-    from pydub import AudioSegment
     import io
+    from pydub import AudioSegment
     
     # 科大讯飞应用信息（请替换为你的密钥）
     XF_APPID = 'aeb3e48c'
@@ -281,7 +281,7 @@ def xunfei_asr(audio_path: str, appid: str, apisecret: str, apikey: str) -> str:
     # 转换为 base64
     audio_base64 = base64.b64encode(audio_data).decode('utf-8')
     
-    # 构建请求
+    # 构建请求参数
     business_args = {
         "aue": "raw",
         "auf": "audio/L16;rate=16000",
@@ -300,11 +300,18 @@ def xunfei_asr(audio_path: str, appid: str, apisecret: str, apikey: str) -> str:
     date = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime())
     
     # 生成签名
-    signature_origin = f"host: {host}\ndate: {date}\nGET /v2/iat HTTP/1.1"
-    signature_sha = hmac.new(apisecret.encode('utf-8'), signature_origin.encode('utf-8'), digestmod=hashlib.sha256).digest()
+    signature_origin = "host: " + host + "\n"
+    signature_origin += "date: " + date + "\n"
+    signature_origin += "GET /v2/iat HTTP/1.1"
+    
+    signature_sha = hmac.new(
+        apisecret.encode('utf-8'), 
+        signature_origin.encode('utf-8'), 
+        digestmod=hashlib.sha256
+    ).digest()
     signature_sha_base64 = base64.b64encode(signature_sha).decode('utf-8')
     
-    authorization_origin = f'api_key="{apikey}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
+    authorization_origin = 'api_key="' + apikey + '", algorithm="hmac-sha256", headers="host date request-line", signature="' + signature_sha_base64 + '"'
     authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode('utf-8')
     
     # 构建完整 URL
@@ -317,20 +324,29 @@ def xunfei_asr(audio_path: str, appid: str, apisecret: str, apikey: str) -> str:
     
     # WebSocket 回调
     result = []
+    error_msg = None
     
     def on_message(ws, message):
-        data = json.loads(message)
-        if data.get('code') != 0:
-            raise Exception(f"识别错误: {data.get('message')}")
-        
-        if 'result' in data and 'ws' in data['result']:
-            for item in data['result']['ws']:
-                if 'cw' in item:
-                    for cw in item['cw']:
-                        result.append(cw['w'])
+        nonlocal error_msg
+        try:
+            data = json.loads(message)
+            if data.get('code') != 0:
+                error_msg = f"识别错误: {data.get('message')}"
+                ws.close()
+                return
+            
+            if 'result' in data and 'ws' in data['result']:
+                for item in data['result']['ws']:
+                    if 'cw' in item:
+                        for cw in item['cw']:
+                            result.append(cw['w'])
+        except Exception as e:
+            error_msg = f"解析消息失败: {e}"
+            ws.close()
     
     def on_error(ws, error):
-        print(f"WebSocket 错误: {error}")
+        nonlocal error_msg
+        error_msg = f"WebSocket 错误: {error}"
     
     def on_close(ws, close_status_code, close_msg):
         pass
@@ -365,6 +381,9 @@ def xunfei_asr(audio_path: str, appid: str, apisecret: str, apikey: str) -> str:
     )
     
     ws.run_forever()
+    
+    if error_msg:
+        raise Exception(error_msg)
     
     if not result:
         raise Exception("科大讯飞识别结果为空")
