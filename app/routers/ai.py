@@ -311,7 +311,7 @@ async def save_compressed_version(data: Dict[str, Any] = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存压缩版本失败: {str(e)}")
 
-@router.post("/extract-exam-points")
+@router.post("/ai/extract-exam-points")
 async def extract_exam_points(data: Dict[str, Any] = Body(...)):
     try:
         fileId = data.get("fileId")
