@@ -242,6 +242,12 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     支持 wav/flac/opus/m4a/mp3 格式,最长5小时
     """
     import os
+    import time
+    import json
+    import base64
+    import hashlib
+    import hmac
+    import requests
     
     # 获取文件名和大小
     file_name = os.path.basename(audio_path)
