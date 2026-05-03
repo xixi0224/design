@@ -774,11 +774,16 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
         fileId = data.get("fileId")
         
         # 调试：打印原始输入
-        print(f"原始fileId: {fileId}")
+        print(f"原始fileId: {fileId}，类型: {type(fileId)}")
+        
+        # 如果fileId是数字（audio_id），直接用于数据库查询
+        # 如果是字符串，可能是路径或URL
+        file_id_is_number = isinstance(fileId, int) or (isinstance(fileId, str) and fileId.isdigit())
+        print(f"fileId是否为数字: {file_id_is_number}")
         
         # URL解码处理 - 处理前端传入的编码路径
         import urllib.parse
-        if fileId and isinstance(fileId, str):
+        if fileId and isinstance(fileId, str) and not fileId.isdigit():
             # 【修改点1】先判断是否是完整URL
             if fileId.startswith('http://') or fileId.startswith('https://'):
                 parsed_url = urllib.parse.urlparse(fileId)
@@ -842,11 +847,15 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
             if result:
                 audio_path = result[0]
                 print(f"从数据库找到音频文件: {audio_path}")
-                # 确保路径格式正确
-                if audio_path.startswith('/'):
-                    audio_path = audio_path[1:]
-                if not audio_path.startswith('uploads/'):
-                    audio_path = 'uploads/' + audio_path
+                # 如果是URL，直接使用；否则处理本地路径
+                if audio_path.startswith('http://') or audio_path.startswith('https://'):
+                    print(f"检测到URL，直接使用")
+                else:
+                    # 确保路径格式正确
+                    if audio_path.startswith('/'):
+                        audio_path = audio_path[1:]
+                    if not audio_path.startswith('uploads/'):
+                        audio_path = 'uploads/' + audio_path
             else:
                 # 如果数据库中没有找到，尝试从uploads目录中直接查找
                 print(f"数据库中未找到音频文件，fileId: {fileId}")
@@ -865,28 +874,31 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
         
         print(f"最终使用的音频文件路径: {audio_path}")
         
-        # 直接使用本地文件路径，不要用URL（Railway部署时URL无法被FFmpeg访问）
         if not audio_path:
             print("没有找到音频文件")
             raise HTTPException(status_code=404, detail="音频文件不存在")
         
-        # 检查文件是否实际存在
-        import os
-        full_path = audio_path
-        if not os.path.isabs(audio_path):
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            full_path = os.path.join(project_root, audio_path)
+        # 如果是URL，直接使用；否则检查本地文件
+        is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
         
-        if not os.path.exists(full_path):
-            print(f"文件不存在: {full_path}")
-            # 列出uploads目录内容
-            uploads_dir = os.path.join(project_root, "uploads")
-            if os.path.exists(uploads_dir):
-                files = os.listdir(uploads_dir)
-                print(f"uploads目录中的文件: {files}")
-            raise HTTPException(status_code=404, detail=f"音频文件不存在: {audio_path}")
+        if not is_url:
+            # 检查本地文件是否存在
+            import os
+            full_path = audio_path
+            if not os.path.isabs(audio_path):
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                full_path = os.path.join(project_root, audio_path)
+            
+            if not os.path.exists(full_path):
+                print(f"文件不存在: {full_path}")
+                # 列出uploads目录内容
+                uploads_dir = os.path.join(project_root, "uploads")
+                if os.path.exists(uploads_dir):
+                    files = os.listdir(uploads_dir)
+                    print(f"uploads目录中的文件: {files}")
+                raise HTTPException(status_code=404, detail=f"音频文件不存在: {audio_path}")
         
-        print(f"文件存在，大小: {os.path.getsize(full_path)} bytes")
+            print(f"文件存在，大小: {os.path.getsize(full_path)} bytes")
         
         # 调用真实的语音转文字服务（直接传递本地文件路径）
         from app.services.ai_analysis_service import asr_service
