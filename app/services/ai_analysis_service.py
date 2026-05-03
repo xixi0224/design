@@ -195,8 +195,9 @@ def asr_service(audio_path: str):
     import requests
     from pydub import AudioSegment
     
-    # 科大讯飞应用信息
+    # 科大讯飞应用信息（录音文件转写使用SecretKey）
     XF_APPID = 'aeb3e48c'
+    XF_SecretKey = '7d7661435c437720c1fabeae8d028511'
     XF_APISecret = 'YTNINTI0MTA2NTQxNTkxYjM1OTk3NGJh'
     XF_APIKey = '398738e17522920aa9731b3bf2ff4988'
     
@@ -229,8 +230,8 @@ def asr_service(audio_path: str):
             
             print(f"文件存在,大小: {os.path.getsize(full_path)} bytes")
             
-            # 使用科大讯飞录音文件转写 API
-            return xunfei_lfasr(full_path, XF_APPID, XF_APISecret)
+            # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
+            return xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
     
     except Exception as e:
         raise Exception(f"语音转文本失败：{e}")
