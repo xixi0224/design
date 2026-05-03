@@ -355,7 +355,8 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         'signa': signa,
         'ts': ts,
         'task_id': task_id,
-        'slice_id': '0'  # 修正：切片ID从0开始
+        'slice_id': '0',
+        'slice_num': '1'  # 添加：总切片数
     }
     upload_files = {
         'content': (file_name, file_content, 'audio/mpeg')
