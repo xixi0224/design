@@ -846,6 +846,8 @@ async def asr_convert(data: Dict[str, Any] = Body(...)):
             result = cursor.fetchone()
             if result:
                 audio_path = result[0]
+                # 清理URL中的空白字符（可能存在tab或空格）
+                audio_path = audio_path.strip()
                 print(f"从数据库找到音频文件: {audio_path}")
                 # 如果是URL，直接使用；否则处理本地路径
                 if audio_path.startswith('http://') or audio_path.startswith('https://'):
@@ -1098,7 +1100,9 @@ async def upload_audio(request: Request):
                 
                 if ret and 'key' in ret:
                     # 七牛云测试域名不支持HTTPS，使用HTTP
-                    qiniu_url = f"http://{QINIU_DOMAIN}/{file_name}"
+                    # 清理域名中的空白字符，防止URL错误
+                    clean_domain = QINIU_DOMAIN.strip()
+                    qiniu_url = f"http://{clean_domain}/{file_name}"
                     print(f"七牛云CDN地址: {qiniu_url}")
             else:
                 print("未配置七牛云，跳过上传")
