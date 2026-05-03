@@ -204,35 +204,9 @@ def asr_service(audio_path: str):
     try:
         # 判断输入是 URL 还是本地文件路径
         is_url = audio_path.startswith('http://') or audio_path.startswith('https://')
-        full_path = None
         
         if is_url:
-            # URL 输入：先下载到临时目录
-            print(f"检测到URL: {audio_path}")
-            
-            # 创建临时目录
-            import tempfile
-            temp_dir = tempfile.mkdtemp()
-            print(f"创建临时目录: {temp_dir}")
-            
-            # 从URL提取文件名
-            import urllib.parse
-            parsed_url = urllib.parse.urlparse(audio_path)
-            filename = os.path.basename(parsed_url.path)
-            full_path = os.path.join(temp_dir, filename)
-            print(f"临时文件路径: {full_path}")
-            
-            # 下载文件
-            print("开始下载文件...")
-            response = requests.get(audio_path, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            with open(full_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            file_size = os.path.getsize(full_path)
-            print(f"文件下载完成，大小: {file_size} bytes")
+            raise Exception("URL 识别暂不支持,请使用本地文件")
         else:
             # 本地文件路径处理
             print(f"本地文件路径: {audio_path}")
@@ -255,16 +229,9 @@ def asr_service(audio_path: str):
                 raise RuntimeError(f"音频文件不存在: {full_path}")
             
             print(f"文件存在,大小: {os.path.getsize(full_path)} bytes")
-        
-        # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
-        result = xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
-        
-        # 如果是URL下载的临时文件，清理临时文件
-        if is_url and os.path.exists(full_path):
-            os.remove(full_path)
-            print(f"清理临时文件: {full_path}")
-        
-        return result
+            
+            # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
+            return xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
     
     except Exception as e:
         raise Exception(f"语音转文本失败：{e}")
@@ -346,6 +313,20 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     signa = base64.b64encode(signa)
     signa = str(signa, 'utf-8')
     
+    # 步骤2: 上传文件
+    print("步骤2: 上传音频文件...")
+    upload_url = 'https://raasr.xfyun.cn/api/upload'
+    
+    # 重新生成签名（upload接口使用 appid + task_id + ts）
+    ts = str(int(time.time()))
+    m2 = hashlib.md5()
+    m2.update((appid + task_id + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
+    md5 = bytes(md5, encoding='utf-8')
+    signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+    signa = base64.b64encode(signa)
+    signa = str(signa, 'utf-8')
+    
     # 读取文件
     with open(audio_path, 'rb') as f:
         file_content = f.read()
@@ -357,8 +338,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         'task_id': task_id,
         'slice_id': 0,
         'slice_num': 1
-    }
-    upload_files = {
+upload_files = {
         'content': (file_name, file_content, 'audio/mpeg')
     }
     
@@ -375,8 +355,8 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.update((appid + ts).encode('utf-8'))
-    md5 = m2.hexdigest()
+    m2.upd    m2.update((appid + task_id + ts).encode('utf-8'))
+m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
     signa = base64.b64encode(signa)
@@ -410,8 +390,8 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         
         ts = str(int(time.time()))
         m2 = hashlib.md5()
-        m2.update((appid + ts).encode('utf-8'))
-        md5 = m2.hexdigest()
+        m2        m2.update((appid + task_id + ts).encode('utf-8'))
+5 = m2.hexdigest()
         md5 = bytes(md5, encoding='utf-8')
         signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
         signa = base64.b64encode(signa)
@@ -446,7 +426,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.update((appid + ts).encode('utf-8'))
+    m2.update((appid + task_id + ts).encode('utf-8'))
     md5 = m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
@@ -461,23 +441,24 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     }
     
     result_response = requests.post(get_result_url, data=result_data, timeout=30)
-    result_json = result_response.json()
+    result_result = result_response.json()
+    print(f"结果响应: {result_result}")
     
-    print(f"结果响应: {result_json}")
-    
-    if result_json.get('ok') != 0:
-        raise Exception(f"获取结果失败: {result_json.get('failed')}")
+    if result_result.get('ok') != 0:
+        raise Exception(f"获取结果失败: {result_result.get('failed')}")
     
     # 解析结果
-    data_str = result_json.get('data', '')
-    if data_str:
-        data_json = json.loads(data_str)
-        sentences = data_json.get('utterances', [])
-        text = ''.join([s.get('transcript', '') for s in sentences])
-        print(f"识别成功,文本长度: {len(text)}")
-        return text
+    result_data = result_result.get('data', {})
+    if isinstance(result_data, dict):
+        result_data = result_data.get('data', result_data)
     
-    raise Exception("识别结果为空")
-
-
-
+    if isinstance(result_data, list):
+        text = ''
+        for item in result_data:
+            if isinstance(item, dict):
+                text += item.get('onebest', '') + '\n'
+            elif isinstance(item, str):
+                text += item + '\n'
+        return text.strip()
+    else:
+        return str(result_data)
