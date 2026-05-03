@@ -187,13 +187,15 @@ def asr_service(audio_path: str):
     from pydub import AudioSegment
     import io
     
-    # 百度云应用信息
-    API_KEY = 'HYPim6GzLxhPjBXIv11DRCt8'
-    SECRET_KEY = '6Tiai01NZgTpU5cl4fvJMQBT92F2zuGY'
-    APP_ID = '122981257'
+    # 百度云应用信息（替换为你的API密钥）
+    API_KEY = '2PaExHSADS0FsN0vjEKG4sTE'
+    SECRET_KEY = 'XKt0lLx3ElKzVbwxGwXXKg1DoFpS23Pb'
+    APP_ID = '7695620'
     
-    # 初始化百度云语音客户端
+    # 初始化百度云语音客户端，设置超时时间
     client = AipSpeech(APP_ID, API_KEY, SECRET_KEY)
+    client.setConnectionTimeoutInMillis(60000)  # 60秒连接超时
+    client.setSocketTimeoutInMillis(60000)  # 60秒读取超时
     
     try:
         # 判断输入是 URL 还是本地文件路径
@@ -256,17 +258,34 @@ def asr_service(audio_path: str):
                 # 获取文件扩展名
                 file_ext = os.path.splitext(full_path)[1].lower().replace('.', '')
                 
-                # 调用百度云 API
-                result = client.asr(audio_data, file_ext, 16000, {
-                    'dev_pid': 1537,  # 中文普通话
-                })
-                
-                print(f"百度云识别响应: {result}")
-                
-                if result.get('err_no') == 0 and 'result' in result:
-                    return ''.join(result['result'])
-                else:
-                    raise Exception(f"ASR 识别失败: {result.get('err_msg', '识别失败')}")
+                # 调用百度云 API，增加重试机制
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        print(f"调用百度云 API（尝试 {attempt + 1}/{max_retries}）...")
+                        result = client.asr(audio_data, file_ext, 16000, {
+                            'dev_pid': 1537,  # 中文普通话
+                        })
+                                    
+                        print(f"百度云识别响应: {result}")
+                                    
+                        if result.get('err_no') == 0 and 'result' in result:
+                            return ''.join(result['result'])
+                        else:
+                            # 如果是限流错误，等待后重试
+                            if result.get('err_no') == 3302:
+                                print(f"API 限流，等待 2 秒后重试...")
+                                import time
+                                time.sleep(2)
+                                continue
+                            raise Exception(f"ASR 识别失败: {result.get('err_msg', '识别失败')}")
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            print(f"调用失败: {e}，等待 2 秒后重试...")
+                            import time
+                            time.sleep(2)
+                        else:
+                            raise Exception(f"ASR 识别失败: {e}")
             else:
                 # 长音频：分段处理
                 print(f"长音频，需要分为 {int(duration_seconds // MAX_SEGMENT_DURATION) + 1} 段处理")
@@ -291,18 +310,37 @@ def asr_service(audio_path: str):
                     segment.export(buffer, format=file_ext)
                     audio_data = buffer.getvalue()
                     
-                    # 调用百度云 API
-                    result = client.asr(audio_data, file_ext, 16000, {
-                        'dev_pid': 1537,
-                    })
-                    
-                    print(f"第 {i+1} 段识别响应: {result}")
-                    
-                    if result.get('err_no') == 0 and 'result' in result:
-                        full_text.append(''.join(result['result']))
-                        print(f"第 {i+1} 段识别成功")
-                    else:
-                        print(f"第 {i+1} 段识别失败: {result.get('err_msg', '未知错误')}")
+                    # 调用百度云 API，增加重试机制
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            print(f"调用百度云 API（第 {i+1} 段，尝试 {attempt + 1}/{max_retries}）...")
+                            result = client.asr(audio_data, file_ext, 16000, {
+                                'dev_pid': 1537,
+                            })
+                            
+                            print(f"第 {i+1} 段识别响应: {result}")
+                            
+                            if result.get('err_no') == 0 and 'result' in result:
+                                full_text.append(''.join(result['result']))
+                                print(f"第 {i+1} 段识别成功")
+                                break
+                            else:
+                                # 如果是限流错误，等待后重试
+                                if result.get('err_no') == 3302:
+                                    print(f"API 限流，等待 2 秒后重试...")
+                                    import time
+                                    time.sleep(2)
+                                    continue
+                                print(f"第 {i+1} 段识别失败: {result.get('err_msg', '未知错误')}")
+                                break
+                        except Exception as e:
+                            if attempt < max_retries - 1:
+                                print(f"第 {i+1} 段调用失败: {e}，等待 2 秒后重试...")
+                                import time
+                                time.sleep(2)
+                            else:
+                                print(f"第 {i+1} 段所有重试失败: {e}")
                 
                 # 合并所有段落的识别结果
                 if full_text:
