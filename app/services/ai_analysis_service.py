@@ -255,13 +255,14 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     print(f"准备上传文件: {file_name}, 大小: {file_size} bytes")
     
-    # 生成签名
+    # 生成签名（按照科大讯飞官方文档：先MD5，再HMAC-SHA1）
     ts = str(int(time.time()))
     base_string = appid + ts
+    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
     signa = hmac.new(
         apisecret.encode('utf-8'),
-        base_string.encode('utf-8'),
-        digestmod=hashlib.sha256
+        md5_value.encode('utf-8'),
+        digestmod=hashlib.sha1
     ).digest()
     signa = base64.b64encode(signa).decode('utf-8')
     
@@ -296,10 +297,11 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     # 重新生成签名 (upload接口需要 task_id)
     ts = str(int(time.time()))
     base_string = appid + task_id + ts
+    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
     signa = hmac.new(
         apisecret.encode('utf-8'),
-        base_string.encode('utf-8'),
-        digestmod=hashlib.sha256
+        md5_value.encode('utf-8'),
+        digestmod=hashlib.sha1
     ).digest()
     signa = base64.b64encode(signa).decode('utf-8')
     
@@ -331,10 +333,11 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     base_string = appid + task_id + ts
+    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
     signa = hmac.new(
         apisecret.encode('utf-8'),
-        base_string.encode('utf-8'),
-        digestmod=hashlib.sha256
+        md5_value.encode('utf-8'),
+        digestmod=hashlib.sha1
     ).digest()
     signa = base64.b64encode(signa).decode('utf-8')
     
@@ -366,10 +369,11 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         
         ts = str(int(time.time()))
         base_string = appid + task_id + ts
+        md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
         signa = hmac.new(
             apisecret.encode('utf-8'),
-            base_string.encode('utf-8'),
-            digestmod=hashlib.sha256
+            md5_value.encode('utf-8'),
+            digestmod=hashlib.sha1
         ).digest()
         signa = base64.b64encode(signa).decode('utf-8')
         
@@ -402,10 +406,11 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     base_string = appid + task_id + ts
+    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
     signa = hmac.new(
         apisecret.encode('utf-8'),
-        base_string.encode('utf-8'),
-        digestmod=hashlib.sha256
+        md5_value.encode('utf-8'),
+        digestmod=hashlib.sha1
     ).digest()
     signa = base64.b64encode(signa).decode('utf-8')
     
