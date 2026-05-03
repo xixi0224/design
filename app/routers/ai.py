@@ -1043,10 +1043,26 @@ async def save_tags(data: Dict[str, Any] = Body(...)):
 async def upload_audio(request: Request):
     try:
         # 处理文件上传
-        form = await r        content = await audio_file.read()
+        form = await request.form()
+        audio_file = form.get("audio")
+        
+        if not audio_file:
+            raise HTTPException(status_code=400, detail="未上传音频文件")
+        
+        # 创建上传目录
+        upload_dir = "uploads"
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+        
+        # 使用UUID生成安全的文件名
+        file_ext = os.path.splitext(audio_file.filename)[1] if audio_file.filename else '.mp3'
+        file_name = f"{uuid.uuid4().hex}{file_ext}"
+        file_path = os.path.join(upload_dir, file_name)
+        
+        # 保存文件
+        content = await audio_file.read()
         with open(file_path, "wb") as f:
             f.write(content)
-            print(f"写入文件大小: {len(content)} bytes")
         
         # 检查文件是否保存成功
         if os.path.exists(file_path):
@@ -1077,7 +1093,9 @@ async def upload_audio(request: Request):
                 print(f"七牛云上传信息: {info}")
                 
                 if ret and 'key' in ret:
-                    qiniu_url = f"https://{QINIU_DOMAIN}/{file_name}"
+                    # 七牛云测试域名不支持HTTPS，使用HTTP
+                    clean_domain = QINIU_DOMAIN.strip()
+                    qiniu_url = f"http://{clean_domain}/{file_name}"
                     print(f"七牛云CDN地址: {qiniu_url}")
             else:
                 print("未配置七牛云，跳过上传")
@@ -1101,11 +1119,10 @@ async def upload_audio(request: Request):
             )
             audio_id = cursor.lastrowid
             conn.commit()
-            print(f"数据库保存成功，au                    # 七牛云测试域名不支持HTTPS，使用HTTP
-                    # 清理域名中的空白字符，防止URL错误
-                    clean_domain = QINIU_DOMAIN.strip()
-                    qiniu_url = f"http://{clean_domain}/{file_name}"
- print(f"数据库保存失败: {db_error}")
+            print(f"数据库保存成功，audio_id: {audio_id}")
+        except Exception as db_error:
+            print(f"数据库保存失败: {db_error}")
+            conn.rollback()
         finally:
             if cursor:
                 cursor.close()
