@@ -310,7 +310,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 步骤1: 预处理 - 创建任务
     print("步骤1: 创建转写任务...")
-    prepare_url = 'https://lfassr.xfyun.cn/v2/api/prepare'
+    prepare_url = 'https://raasr.xfyun.cn/api/prepare'
     prepare_data = {
         'app_id': appid,
         'signa': signa,
@@ -334,7 +334,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 步骤2: 上传文件
     print("步骤2: 上传音频文件...")
-    upload_url = 'https://lfassr.xfyun.cn/v2/api/upload'
+    upload_url = 'https://raasr.xfyun.cn/api/upload'
     
     # 重新生成签名（注意：所有接口都用 appid + ts，不用 task_id）
     ts = str(int(time.time()))
@@ -371,7 +371,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 步骤3: 合并文件 (虽然只有一个切片,但仍需调用merge)
     print("步骤3: 合并文件...")
-    merge_url = 'https://lfassr.xfyun.cn/v2/api/merge'
+    merge_url = 'https://raasr.xfyun.cn/api/merge'
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
@@ -398,7 +398,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 步骤4: 轮询查询进度
     print("步骤4: 等待转写完成...")
-    get_progress_url = 'https://lfassr.xfyun.cn/v2/api/getProgress'
+    get_progress_url = 'https://raasr.xfyun.cn/api/getProgress'
     
     max_wait = 600  # 最多等待10分钟
     wait_time = 0
@@ -442,7 +442,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 步骤5: 获取结果
     print("步骤5: 获取转写结果...")
-    get_result_url = 'https://lfassr.xfyun.cn/v2/api/getResult'
+    get_result_url = 'https://raasr.xfyun.cn/api/getResult'
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
