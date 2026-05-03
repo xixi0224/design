@@ -303,10 +303,10 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     print("步骤2: 上传音频文件...")
     upload_url = 'https://raasr.xfyun.cn/api/upload'
     
-    # 重新生成签名 (upload接口需要 task_id)
+    # 重新生成签名（注意：所有接口都用 appid + ts，不用 task_id）
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.update((appid + task_id + ts).encode('utf-8'))
+    m2.update((appid + ts).encode('utf-8'))
     md5 = m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
@@ -341,7 +341,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.update((appid + task_id + ts).encode('utf-8'))
+    m2.update((appid + ts).encode('utf-8'))
     md5 = m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
@@ -376,7 +376,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         
         ts = str(int(time.time()))
         m2 = hashlib.md5()
-        m2.update((appid + task_id + ts).encode('utf-8'))
+        m2.update((appid + ts).encode('utf-8'))
         md5 = m2.hexdigest()
         md5 = bytes(md5, encoding='utf-8')
         signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
@@ -412,7 +412,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.update((appid + task_id + ts).encode('utf-8'))
+    m2.update((appid + ts).encode('utf-8'))
     md5 = m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
