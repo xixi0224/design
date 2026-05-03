@@ -178,6 +178,68 @@ def perform_asr(audio_id: int):
         status="processed"
     )
 
+def convert_audio_for_asr(input_path: str) -> str:
+    """
+    使用 ffmpeg/pydub 将音频转换为科大讯飞LFASR支持的格式
+    输出：PCM 16kHz 采样率，单声道，适合语音识别
+    """
+    import os
+    import uuid
+    from pydub import AudioSegment
+    
+    # 获取文件扩展名
+    ext = os.path.splitext(input_path)[1].lower()
+    
+    # 支持的输入格式
+    supported_formats = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.opus']
+    
+    if ext not in supported_formats:
+        print(f"不支持的音频格式: {ext}，尝试使用默认方式打开")
+    
+    try:
+        # 加载音频文件
+        if ext == '.mp3':
+            audio = AudioSegment.from_mp3(input_path)
+        elif ext == '.wav':
+            audio = AudioSegment.from_wav(input_path)
+        elif ext == '.m4a':
+            audio = AudioSegment.from_file(input_path, format='m4a')
+        elif ext == '.flac':
+            audio = AudioSegment.from_flac(input_path)
+        elif ext == '.ogg' or ext == '.opus':
+            audio = AudioSegment.from_ogg(input_path)
+        else:
+            # 尝试自动检测格式
+            audio = AudioSegment.from_file(input_path)
+        
+        # 转换为单声道，16kHz采样率
+        audio = audio.set_channels(1)
+        audio = audio.set_frame_rate(16000)
+        
+        # 创建输出目录
+        output_dir = os.path.join(os.path.dirname(input_path), 'converted')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 生成输出文件名
+        output_filename = f"{uuid.uuid4().hex}_16k.wav"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # 导出为WAV格式（PCM）
+        audio.export(output_path, format='wav')
+        
+        print(f"音频转换成功: {input_path} -> {output_path}")
+        print(f"音频时长: {len(audio)/1000:.2f}秒")
+        print(f"采样率: {audio.frame_rate}Hz")
+        print(f"声道数: {audio.channels}")
+        
+        return output_path
+        
+    except Exception as e:
+        print(f"音频转换失败，使用原始文件: {e}")
+        # 如果转换失败，返回原始文件路径
+        return input_path
+
+
 def asr_service(audio_path: str):
     """
     使用科大讯飞录音文件转写 API 进行语音转文本
@@ -230,8 +292,14 @@ def asr_service(audio_path: str):
             
             print(f"文件存在,大小: {os.path.getsize(full_path)} bytes")
             
+            # 使用 ffmpeg/pydub 转换音频格式为科大讯飞支持的格式
+            # 科大讯飞LFASR支持: wav, flac, opus, m4a, mp3
+            # 转换为PCM格式确保兼容性
+            converted_path = convert_audio_for_asr(full_path)
+            print(f"转换后的音频文件: {converted_path}")
+            
             # 使用科大讯飞录音文件转写 API（使用SecretKey而不是APISecret）
-            return xunfei_lfasr(full_path, XF_APPID, XF_SecretKey)
+            return xunfei_lfasr(converted_path, XF_APPID, XF_SecretKey)
     
     except Exception as e:
         raise Exception(f"语音转文本失败：{e}")
