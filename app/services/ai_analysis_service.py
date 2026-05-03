@@ -240,6 +240,7 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     """
     使用科大讯飞录音文件转写 API (LFASR - Long Form ASR)
     支持 wav/flac/opus/m4a/mp3 格式,最长5小时
+    严格按照官方Python3 demo实现
     """
     import os
     import time
@@ -255,22 +256,22 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     print(f"准备上传文件: {file_name}, 大小: {file_size} bytes")
     
-    # 生成签名（按照科大讯飞官方文档：先MD5，再HMAC-SHA1）
+    # 生成签名（严格按照科大讯飞官方Python3 demo实现）
     ts = str(int(time.time()))
-    base_string = appid + ts
-    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
-    signa = hmac.new(
-        apisecret.encode('utf-8'),
-        md5_value.encode('utf-8'),
-        digestmod=hashlib.sha1
-    ).digest()
-    signa = base64.b64encode(signa).decode('utf-8')
+    m2 = hashlib.md5()
+    m2.update((appid + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
+    md5 = bytes(md5, encoding='utf-8')
+    # 以secret_key为key, 上面的md5为msg， 使用hashlib.sha1加密结果为signa
+    signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+    signa = base64.b64encode(signa)
+    signa = str(signa, 'utf-8')
     
     # 调试信息
     print(f"APPID: {appid}")
     print(f"时间戳: {ts}")
-    print(f"BaseString: {base_string}")
-    print(f"MD5: {md5_value}")
+    print(f"BaseString: {appid + ts}")
+    print(f"MD5 hexdigest: {md5.decode('utf-8')}")
     print(f"Signa: {signa}")
     
     # 步骤1: 预处理 - 创建任务
@@ -303,14 +304,13 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     
     # 重新生成签名 (upload接口需要 task_id)
     ts = str(int(time.time()))
-    base_string = appid + task_id + ts
-    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
-    signa = hmac.new(
-        apisecret.encode('utf-8'),
-        md5_value.encode('utf-8'),
-        digestmod=hashlib.sha1
-    ).digest()
-    signa = base64.b64encode(signa).decode('utf-8')
+    m2 = hashlib.md5()
+    m2.update((appid + task_id + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
+    md5 = bytes(md5, encoding='utf-8')
+    signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+    signa = base64.b64encode(signa)
+    signa = str(signa, 'utf-8')
     
     # 读取文件
     with open(audio_path, 'rb') as f:
@@ -339,14 +339,13 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     merge_url = 'https://raasr.xfyun.cn/api/merge'
     
     ts = str(int(time.time()))
-    base_string = appid + task_id + ts
-    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
-    signa = hmac.new(
-        apisecret.encode('utf-8'),
-        md5_value.encode('utf-8'),
-        digestmod=hashlib.sha1
-    ).digest()
-    signa = base64.b64encode(signa).decode('utf-8')
+    m2 = hashlib.md5()
+    m2.update((appid + task_id + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
+    md5 = bytes(md5, encoding='utf-8')
+    signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+    signa = base64.b64encode(signa)
+    signa = str(signa, 'utf-8')
     
     merge_data = {
         'app_id': appid,
@@ -375,14 +374,13 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         wait_time += poll_interval
         
         ts = str(int(time.time()))
-        base_string = appid + task_id + ts
-        md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
-        signa = hmac.new(
-            apisecret.encode('utf-8'),
-            md5_value.encode('utf-8'),
-            digestmod=hashlib.sha1
-        ).digest()
-        signa = base64.b64encode(signa).decode('utf-8')
+        m2 = hashlib.md5()
+        m2.update((appid + task_id + ts).encode('utf-8'))
+        md5 = m2.hexdigest()
+        md5 = bytes(md5, encoding='utf-8')
+        signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+        signa = base64.b64encode(signa)
+        signa = str(signa, 'utf-8')
         
         progress_data = {
             'app_id': appid,
@@ -412,14 +410,13 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     get_result_url = 'https://raasr.xfyun.cn/api/getResult'
     
     ts = str(int(time.time()))
-    base_string = appid + task_id + ts
-    md5_value = hashlib.md5(base_string.encode('utf-8')).hexdigest()
-    signa = hmac.new(
-        apisecret.encode('utf-8'),
-        md5_value.encode('utf-8'),
-        digestmod=hashlib.sha1
-    ).digest()
-    signa = base64.b64encode(signa).decode('utf-8')
+    m2 = hashlib.md5()
+    m2.update((appid + task_id + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
+    md5 = bytes(md5, encoding='utf-8')
+    signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
+    signa = base64.b64encode(signa)
+    signa = str(signa, 'utf-8')
     
     result_data = {
         'app_id': appid,
