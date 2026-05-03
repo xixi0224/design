@@ -10,3 +10,4 @@ olefile
 baidu-aip
 pydub
 websocket-client
+qiniu>=7.12.0

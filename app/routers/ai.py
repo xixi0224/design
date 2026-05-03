@@ -1051,8 +1051,8 @@ async def upload_audio(request: Request):
         # 保存文件
         print(f"开始保存文件: {file_path}")
         print(f"文件大小: {audio_file.size} bytes")
+        content = await audio_file.read()
         with open(file_path, "wb") as f:
-            content = await audio_file.read()
             f.write(content)
             print(f"写入文件大小: {len(content)} bytes")
         
@@ -1062,6 +1062,35 @@ async def upload_audio(request: Request):
             print(f"文件保存成功，大小: {file_size} bytes")
         else:
             print("文件保存失败，文件不存在")
+        
+        # 尝试上传到七牛云
+        qiniu_url = None
+        try:
+            from app.config import QINIU_AK, QINIU_SK, QINIU_BUCKET, QINIU_DOMAIN
+            
+            if QINIU_AK and QINIU_SK and QINIU_BUCKET and QINIU_DOMAIN:
+                print("配置了七牛云，开始上传...")
+                import qiniu
+                from qiniu import Auth, put_data
+                
+                # 构建鉴权对象
+                q = Auth(QINIU_AK, QINIU_SK)
+                
+                # 生成上传凭证
+                token = q.upload_token(QINIU_BUCKET, file_name, 3600)
+                
+                # 上传文件
+                ret, info = put_data(token, file_name, content)
+                print(f"七牛云上传结果: {ret}")
+                print(f"七牛云上传信息: {info}")
+                
+                if ret and 'key' in ret:
+                    qiniu_url = f"https://{QINIU_DOMAIN}/{file_name}"
+                    print(f"七牛云CDN地址: {qiniu_url}")
+            else:
+                print("未配置七牛云，跳过上传")
+        except Exception as qiniu_error:
+            print(f"七牛云上传失败: {qiniu_error}")
         
         # 保存到数据库，获取audio_id
         conn = None
@@ -1076,7 +1105,7 @@ async def upload_audio(request: Request):
                 INSERT INTO zhinote_audio_files (file_name, file_path, created_at)
                 VALUES (%s, %s, NOW())
                 """,
-                (file_name, file_path)
+                (file_name, qiniu_url if qiniu_url else file_path)
             )
             audio_id = cursor.lastrowid
             conn.commit()
@@ -1090,32 +1119,31 @@ async def upload_audio(request: Request):
                 conn.close()
         
         # 构建可访问的URL路径
-        # 确保路径格式正确：相对路径，不带开头斜杠
-        url_path = file_path.replace('\\', '/')
-        # 确保路径以 uploads/ 开头，不带开头斜杠
-        url_path = re.sub(r'^/*(uploads/)', r'\1', url_path)
-        # 如果路径不是以 uploads/ 开头，添加前缀
-        if not url_path.startswith('uploads/'):
-            url_path = f'uploads/{url_path}'
-        
-        # 对路径中的文件名部分进行URL编码（处理中文、空格等特殊字符）
-        import urllib.parse
-        if '/' in url_path:
-            path_parts = url_path.rsplit('/', 1)
-            # 只编码文件名部分，不编码路径分隔符
-            encoded_filename = urllib.parse.quote(path_parts[1], safe='')
-            url_path = path_parts[0] + '/' + encoded_filename
+        # 如果有七牛云URL，直接使用
+        if qiniu_url:
+            url_path = qiniu_url
+        else:
+            # 否则使用本地路径
+            url_path = file_path.replace('\\', '/')
+            url_path = re.sub(r'^/*(uploads/)', r'\1', url_path)
+            if not url_path.startswith('uploads/'):
+                url_path = f'uploads/{url_path}'
+            
+            # 对路径中的文件名部分进行URL编码
+            import urllib.parse
+            if '/' in url_path:
+                path_parts = url_path.rsplit('/', 1)
+                encoded_filename = urllib.parse.quote(path_parts[1], safe='')
+                url_path = path_parts[0] + '/' + encoded_filename
         
         # 打印调试信息
         print(f"上传成功，返回路径: {url_path}")
         
         # 返回文件URL和audio_id
-        # 返回相对路径（如 /uploads/xxx.m4a），让前端自己构建完整URL
-        # 这样可以避免URL双重编码问题
         return {
             "code": 0,
             "data": {
-                "filePath": '/' + url_path,  # 返回相对路径，以/开头，如 /uploads/xxx.m4a
+                "filePath": url_path if qiniu_url else ('/' + url_path),
                 "audioId": audio_id or 1
             }
         }
