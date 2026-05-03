@@ -78,6 +78,7 @@ app.include_router(animation_router, prefix="/api")
 app.include_router(content_input_router, prefix="/api")
 app.include_router(ai_analysis_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(ai_router, prefix="")  # 同时支持不带/api前缀的访问
 app.include_router(knowledge_structure_router, prefix="/api")
 app.include_router(study_analysis_router, prefix="/api")
 app.include_router(study_assist_router, prefix="/api")
