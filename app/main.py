@@ -60,7 +60,7 @@ app = FastAPI(title="ZhiNote Backend", lifespan=lifespan)
 
 # 挂载静态文件目录（用于访问上传的音频等文件）
 os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory="uploads", html=False), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
