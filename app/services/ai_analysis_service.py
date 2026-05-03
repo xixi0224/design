@@ -237,6 +237,64 @@ def asr_service(audio_path: str):
         raise Exception(f"语音转文本失败：{e}")
 
 
+def qiniu_asr(audio_path):
+    """使用七牛云语音识别"""
+    import requests
+    
+    # 七牛云配置
+    QINIU_AI_API_KEY = os.environ.get('QINIU_AI_API_KEY', '')
+    
+    if not QINIU_AI_API_KEY:
+        raise Exception("请配置七牛云AI API Key（QINIU_AI_API_KEY）")
+    
+    print(f"开始使用七牛云语音识别: {audio_path}")
+    
+    # 1. 先将音频文件上传到七牛云存储
+    print("步骤1: 上传音频到七牛云存储...")
+    
+    # 读取音频文件
+    with open(audio_path, 'rb') as f:
+        audio_data = f.read()
+    
+    # 上传到七牛云（这里需要你提供一个公开可访问的URL）
+    # 如果音频文件已经在七牛云存储中，可以直接使用其URL
+    # 否则需要先上传到七牛云
+    
+    # TODO: 这里需要你提供音频文件的公开访问URL
+    audio_url = "YOUR_AUDIO_URL_HERE"  # 替换为实际的音频URL
+    
+    # 2. 调用七牛云语音识别API
+    print("步骤2: 调用语音识别API...")
+    
+    url = "https://api.qnaigc.com/v1/voice/asr"
+    headers = {
+        "Authorization": f"Bearer {QINIU_AI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "asr",
+        "audio": {
+            "format": "mp3",  # 根据你的实际格式修改
+            "url": audio_url
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=60)
+        result = response.json()
+        
+        print(f"七牛云ASR响应: {result}")
+        
+        if response.status_code == 200:
+            text = result.get('data', {}).get('result', {}).get('text', '')
+            return text
+        else:
+            raise Exception(f"语音识别失败: {result}")
+    except Exception as e:
+        raise Exception(f"语音识别请求失败: {e}")
+
+
 def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
     """
     使用科大讯飞录音文件转写 API (LFASR - Long Form ASR)
@@ -338,7 +396,8 @@ def xunfei_lfasr(audio_path: str, appid: str, apisecret: str) -> str:
         'task_id': task_id,
         'slice_id': 0,
         'slice_num': 1
-upload_files = {
+    }
+    upload_files = {
         'content': (file_name, file_content, 'audio/mpeg')
     }
     
@@ -355,8 +414,8 @@ upload_files = {
     
     ts = str(int(time.time()))
     m2 = hashlib.md5()
-    m2.upd    m2.update((appid + task_id + ts).encode('utf-8'))
-m2.hexdigest()
+    m2.update((appid + task_id + ts).encode('utf-8'))
+    md5 = m2.hexdigest()
     md5 = bytes(md5, encoding='utf-8')
     signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
     signa = base64.b64encode(signa)
@@ -390,8 +449,8 @@ m2.hexdigest()
         
         ts = str(int(time.time()))
         m2 = hashlib.md5()
-        m2        m2.update((appid + task_id + ts).encode('utf-8'))
-5 = m2.hexdigest()
+        m2.update((appid + task_id + ts).encode('utf-8'))
+        md5 = m2.hexdigest()
         md5 = bytes(md5, encoding='utf-8')
         signa = hmac.new(apisecret.encode('utf-8'), md5, hashlib.sha1).digest()
         signa = base64.b64encode(signa)
